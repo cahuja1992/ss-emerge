@@ -1,6 +1,8 @@
 **SS-EMERGE: Self-Supervised Multidimensional Representation Learning for EEG Emotion Recognition**
 
-This project implements the SS-EMERGE framework, which is designed for robust and label-efficient EEG-based emotion classification. It addresses challenges such as subject variability and the scarcity of labeled data by utilizing self-supervised learning alongside a novel multi-dimensional encoder and stimulus-aware contrastive learning. The development of this project followed a Test-Driven Development (TDD) approach, aiming for robust and well-tested components.
+![SS-EMERGE framework](images/SS-EMERGE-architecture.png)
+
+This project implements the SS-EMERGE framework, which is designed for robust and label-efficient EEG-based emotion classification. It addresses challenges such as subject variability and the scarcity of labeled data by utilizing self-supervised learning alongside a novel multi-dimensional encoder and stimulus-aware contrastive learning.
 
 **Key Features:**
 * **Unified Multi-Domain Encoder**: This encoder integrates spectral (Differential Entropy), spatial (Graph Attention Networks), and temporal (Causal Temporal Convolutional Networks) features to learn comprehensive EEG representations.
