@@ -1,0 +1,65 @@
+# --- General Experiment Settings ---
+experiment_name: "Experiment1_SS_EMERGE_SEED"
+description: "SS-EMERGE on SEED dataset for Baseline Comparison"
+phase: "finetune" # This experiment involves finetuning after pretraining (or directly supervised)
+dataset_name: "SEED"
+num_classes: 3 # Positive, Neutral, Negative for SEED
+
+# --- Data Paths ---
+# These paths are relative to the project root or specified explicitly
+# You will need to prepare these .npy files beforehand (e.g., x_train_SEED.npy, y_train_SEED.npy)
+data_root: "./data/SEED/"
+train_data_path: "x_train_SEED.npy"
+train_labels_path: "y_train_SEED.npy"
+test_data_path: "x_test_SEED.npy"
+test_labels_path: "y_test_SEED.npy"
+# If cross-subject (LOSO), dataset class will handle splits internally based on subject IDs.
+# For simplicity, initially assume train/test splits are pre-prepared.
+
+# --- Model Architecture (SS-EMERGE Specific) ---
+# These parameters will be passed to SS_EMERGE_Encoder and ClassificationHead
+model:
+  encoder:
+    F_bands: 5 # Number of frequency bands for DE features
+    D_spectral: 128 # Spectral embedding dimension
+    C_channels: 62 # Number of EEG channels
+    T_timesteps: 200 # Time points per segment
+    gat_out_channels: 256 # Output channels for GAT layers
+    tcn_channels: [512, 512] # Channels for TCN blocks
+    tcn_kernel_size: 3
+    tcn_dilations: [1, 2]
+    dropout_prob: 0.5 # Dropout for encoder components during pretraining/finetuning (if not frozen)
+  classification_head:
+    in_features: 512 # Matches final_encoder_dim
+    num_classes: 3 # Matches dataset num_classes
+    dropout_prob: 0.5 # Dropout for classifier head during finetuning
+
+# --- Pretraining Settings (if applicable for self-supervised variant) ---
+pretrain:
+  epochs: 3288 # From thesis Table 6.1
+  batch_size: 16 # P: video clips per iteration
+  Q: 2 # Q: samples per group (for Meiosis)
+  temperature: 0.1
+  learning_rate: 0.001
+  save_interval: 500 # Save checkpoint every X epochs
+  pretrained_model_dir: "./pretrained_models/" # Where to save pretrained encoder
+  # Edge indices for GATs (these are typically generated once per dataset/topology)
+  # For the actual run, these would be loaded or generated based on `C_channels` and `T_timesteps`
+  # via graph_helpers.py and passed to the model.
+
+# --- Finetuning Settings ---
+finetune:
+  epochs: 100 # From thesis Table 6.1
+  batch_size: 256
+  learning_rate: 0.001
+  save_interval: 10 # Save checkpoint every X epochs
+  finetuned_model_dir: "./finetuned_models/experiment1/" # Where to save finetuned models
+  label_proportion: 1.0 # 100% labels for initial run of Exp 1 (or 0.1, 0.5 for few-shot)
+  
+# --- Evaluation Settings ---
+evaluate:
+  eval_batch_size: 32
+  # Metrics will be calculated by evaluate.py
+
+# --- Hardware Settings ---
+gpu: 0 # GPU ID to use, -1 for CPU

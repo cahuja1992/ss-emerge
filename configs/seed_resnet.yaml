@@ -1,0 +1,42 @@
+# --- General Experiment Settings ---
+experiment_name: "Experiment1_ResNet_SEED"
+description: "ResNet (SGMC Baseline) on SEED dataset for Baseline Comparison"
+phase: "finetune" # ResNet baseline is typically fully supervised here
+dataset_name: "SEED"
+num_classes: 3 
+
+# --- Data Paths (same as SS-EMERGE variant) ---
+data_root: "./data/SEED/"
+train_data_path: "x_train_SEED.npy"
+train_labels_path: "y_train_SEED.npy"
+test_data_path: "x_test_SEED.npy"
+test_labels_path: "y_test_SEED.npy"
+
+# --- Model Architecture (ResNet Specific) ---
+model:
+  # You'll define parameters specific to your ResNet implementation here
+  # For example, if it's a direct port of kanhaoning's ResNet:
+  model_type: "ResNetEEG" # Custom type to distinguish
+  in_channels: 5 # Assuming input is (F, C, T) where F=5 (DE features)
+  # Other ResNet specific parameters (e.g., blocks, planes if configurable)
+  # This part will be passed directly to your ResNetEEG model's init.
+
+# --- Pretraining Settings (skip for fully supervised baseline) ---
+pretrain:
+  run_pretraining: False # Flag to skip pretraining for this baseline
+
+# --- Finetuning Settings (for fully supervised training) ---
+finetune:
+  epochs: 100 # Adjust as per thesis for baseline
+  batch_size: 256
+  learning_rate: 0.001
+  save_interval: 10
+  finetuned_model_dir: "./finetuned_models/experiment1_resnet/"
+  label_proportion: 1.0 # Fully supervised
+
+# --- Evaluation Settings ---
+evaluate:
+  eval_batch_size: 32
+
+# --- Hardware Settings ---
+gpu: 0

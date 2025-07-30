@@ -1,0 +1,51 @@
+# --- General Experiment Settings ---
+experiment_name: "Experiment2_SS_EMERGE_SEED_100_FS"
+description: "SS-EMERGE Fully Supervised on SEED with 100% labels"
+phase: "finetune" # It's a finetune-like process, but from scratch
+dataset_name: "SEED"
+num_classes: 3 
+
+# --- Data Paths ---
+data_root: "./data/SEED/"
+train_data_path: "x_train_SEED.npy"
+train_labels_path: "y_train_SEED.npy"
+test_data_path: "x_test_SEED.npy"
+test_labels_path: "y_test_SEED.npy"
+
+# --- Model Architecture ---
+model:
+  model_type: "SS_EMERGE_Encoder" # Still uses SS_EMERGE_Encoder, but trained from scratch
+  encoder:
+    F_bands: 5
+    D_spectral: 128
+    C_channels: 62
+    T_timesteps: 200 
+    gat_out_channels: 256
+    tcn_channels: [512, 512]
+    tcn_kernel_size: 3
+    tcn_dilations: [1, 2]
+    dropout_prob: 0.5 
+  classification_head:
+    in_features: 512 
+    num_classes: 3 
+    dropout_prob: 0.5 
+
+# --- Pretraining Settings (explicitly skip for FS) ---
+pretrain:
+  run_pretraining: False # <--- Key change: do not run pretraining
+
+# --- Finetuning Settings ---
+finetune:
+  epochs: 100 
+  batch_size: 256
+  learning_rate: 0.001
+  save_interval: 10
+  finetuned_model_dir: "./finetuned_models/Experiment2_SS_EMERGE_SEED_100_FS/" 
+  label_proportion: 1.0 
+  
+# --- Evaluation Settings ---
+evaluate:
+  eval_batch_size: 32
+
+# --- Hardware Settings ---
+gpu: 0
