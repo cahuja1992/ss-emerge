@@ -113,7 +113,8 @@ class SS_EMERGE_Encoder(nn.Module):
         self.F_bands = F_bands
         self.D_spectral = D_spectral
         self.C_channels = C_channels
-        self.T_timesteps = T_timesteps
+        # T_timesteps here refers to the final time dimension of the DE features, e.g., 265
+        self.T_timesteps = T_timesteps 
         self.gat_out_channels = gat_out_channels
         self.tcn_channels = tcn_channels
         self.tcn_kernel_size = tcn_kernel_size
@@ -128,6 +129,7 @@ class SS_EMERGE_Encoder(nn.Module):
         self.temporal_gat = GATLayer(gat_out_channels, gat_out_channels, heads=4, dropout=dropout_prob, graph_type='temporal')
         
         # 3. Temporal Modelling (TCN)
+        # TCN input channels will be C * gat_out_channels
         tcn_in_channels = C_channels * gat_out_channels
         tcn_layers = []
         current_tcn_in_channels = tcn_in_channels
@@ -135,7 +137,6 @@ class SS_EMERGE_Encoder(nn.Module):
         for i, dilation in enumerate(tcn_dilations):
             out_tcn_c = tcn_channels[i]
             padding_amount = (tcn_kernel_size - 1) * dilation
-            
             tcn_layers.append(
                 TCNBlock(current_tcn_in_channels, out_tcn_c, tcn_kernel_size,
                          dilation, padding_amount, dropout_prob)
@@ -143,32 +144,32 @@ class SS_EMERGE_Encoder(nn.Module):
             current_tcn_in_channels = out_tcn_c
             
         self.tcn_sequence = nn.Sequential(*tcn_layers)
-        self.final_tcn_output_dim = current_tcn_in_channels # Store for external use
+        self.final_tcn_output_dim = current_tcn_in_channels
         
         self.global_pool = nn.AdaptiveMaxPool1d(1)
 
     def forward(self, x, spatial_edge_index=None, temporal_edge_index=None, mode='embedding'):
-        # x: (B, F, C, T) -> raw DE features from dataset
-        B, F, C, T = x.shape
+        B_eff, F, C, T = x.shape
 
-        # 1. Spectral Embedding: (B, F, C, T) -> (B, C, T, D_spectral)
-        z_spectral = self.spectral_embedding(x)
+        z_spectral = self.spectral_embedding(x) # (B_eff, C, T, D_spectral)
+        z_spatial_gat = self.spatial_gat(z_spectral, spatial_edge_index) # (B_eff, C, T, gat_out_channels)
+        z_temporal_gat = self.temporal_gat(z_spatial_gat, temporal_edge_index) # (B_eff, C, T, gat_out_channels)
 
-        # 2. Spatio-Temporal Modelling (GATs)
-        z_spatial_gat = self.spatial_gat(z_spectral, spatial_edge_index)
-        z_temporal_gat = self.temporal_gat(z_spatial_gat, temporal_edge_index)
+        z_merged = z_temporal_gat
 
-        z_merged = z_temporal_gat # Using the output of the last GAT as the merged representation
+        # CORRECTED RESHAPE LOGIC:
+        # From (B_eff, C, T, D_out) to (B_eff, C * D_out, T)
+        # Permute to (B_eff, T, C, D_out)
+        tcn_in = z_merged.permute(0, 2, 1, 3)
+        # Reshape to (B_eff, T, C*D_out)
+        tcn_in = tcn_in.reshape(B_eff, T, self.C_channels * self.gat_out_channels)
+        # Transpose to (B_eff, C*D_out, T)
+        tcn_in = tcn_in.transpose(1, 2)
+        
+        # A simpler, single-line version of the above:
+        # tcn_in = z_merged.permute(0, 2, 1, 3).reshape(B_eff, self.T_timesteps, -1).transpose(1,2)
 
-        # 3. Temporal Modelling (TCN)
-        # Reshape for TCN: (B, C, T, gat_out_channels) -> (B, C * gat_out_channels, T)
-        tcn_in = z_merged.permute(0, 3, 1, 2).reshape(B, self.C_channels * self.gat_out_channels, self.T_timesteps)
+        z_tcn_out = self.tcn_sequence(tcn_in)
+        final_embedding = self.global_pool(z_tcn_out).squeeze(-1)
 
-        z_tcn_out = self.tcn_sequence(tcn_in) # (B, final_tcn_channels, T_reduced)
-
-        # Global Pooling: (B, final_tcn_channels, T_reduced) -> (B, final_tcn_channels)
-        final_embedding = self.global_pool(z_tcn_out).squeeze(-1) # Squeeze to remove the 1-dim time dimension
-
-        # The 'mode' parameter is accepted but ignored by this encoder, as it only produces the embedding.
-        # The heads (classifier/contrast) are external to this encoder class.
         return final_embedding

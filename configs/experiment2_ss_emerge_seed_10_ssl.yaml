@@ -1,16 +1,18 @@
+# configs/experiment2_ss_emerge_seed_10_ssl.yaml
+
 # --- General Experiment Settings ---
 experiment_name: "Experiment2_SS_EMERGE_SEED_10_SSL"
-description: "SS-EMERGE Self-Supervised on SEED with 50% labels"
-phase: "finetune" # Always finetune phase after pretrain for SSL
+description: "SS-EMERGE Self-Supervised on SEED with 10% labels"
+phase: "finetune"
 dataset_name: "SEED"
 num_classes: 3 
 
 # --- Data Paths ---
-data_root: "./data/SEED/"
-train_data_path: "x_train_SEED.npy"
-train_labels_path: "y_train_SEED.npy"
-test_data_path: "x_test_SEED.npy"
-test_labels_path: "y_test_SEED.npy"
+data_root: "./data/SEED/prepared_data"
+train_data_path: "x_train_SEED_videos.npy"
+train_labels_path: "y_train_SEED_videos.npy"
+test_data_path: "x_test_SEED_videos.npy"
+test_labels_path: "y_test_SEED_videos.npy"
 
 # --- Model Architecture ---
 model:
@@ -19,12 +21,15 @@ model:
     F_bands: 5
     D_spectral: 128
     C_channels: 62
-    T_timesteps: 200 # Original SFREQ of dataset segments
+    T_timesteps: 265 # <--- CORRECTED: This must match DE_TIME_WINDOWS from data prep script!
     gat_out_channels: 256
     tcn_channels: [512, 512]
     tcn_kernel_size: 3
     tcn_dilations: [1, 2]
-    dropout_prob: 0.5 
+    dropout_prob: 0.5
+  projection_head:
+    hidden_features: [1024, 2048, 4096]
+    dropout_prob: 0.5
   classification_head:
     in_features: 512 
     num_classes: 3 
@@ -32,9 +37,9 @@ model:
 
 # --- Pretraining Settings ---
 pretrain:
-  epochs: 3288 # From thesis Table 6.1
-  batch_size: 16 # P
-  Q: 2 # Q
+  epochs: 3288
+  batch_size: 15 # <--- CORRECTED: Changed batch_size to 15 (less than or equal to dataset size)
+  Q: 2
   temperature: 0.1
   learning_rate: 0.001
   save_interval: 500
@@ -42,12 +47,12 @@ pretrain:
 
 # --- Finetuning Settings ---
 finetune:
-  epochs: 100 # From thesis Table 6.1
+  epochs: 100
   batch_size: 256
   learning_rate: 0.001
   save_interval: 10
   finetuned_model_dir: "./finetuned_models/Experiment2_SS_EMERGE_SEED_10_SSL/" 
-  label_proportion: 0.1 # <--- Key change for this experiment
+  label_proportion: 0.1
   
 # --- Evaluation Settings ---
 evaluate:

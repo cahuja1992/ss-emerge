@@ -3,6 +3,7 @@ import random
 import torch # Not directly used in Meiosis, but useful for overall context
 from ss_emerge.utils.data_helpers import group_sample_subjects # Import the subject sampler
 
+
 def Meiosis(signal, Q, rand_subs_stre, split):
     """
     Performs meiosis-inspired data augmentation for a single video's EEG signals.
@@ -11,41 +12,46 @@ def Meiosis(signal, Q, rand_subs_stre, split):
 
     Args:
         signal (np.ndarray): Input EEG signals for one video clip,
-                             shape (num_subjects, F, channels, time_points).
-                             (e.g., (45, 5, 62, 200) for SEED-like, or (40, 1, 32, 128) for DEAP-like).
+                             shape (num_subjects, num_bands, num_channels, num_time_windows_de).
+                             (e.g., (45, 5, 62, 265) for SEED-like).
         Q (int): This Q parameter is used in the `rand_subs_stre` indexing (`i+Q`).
                  It's the "group size" used to pick the second subject for recombination.
         rand_subs_stre (list): A list of shuffled subject indices from the current video's subjects
                                 from which to pick pairs for recombination. Its length should be
                                 at least `num_recombination_pairs + Q`.
         split (int): The temporal midpoint (index) for splitting and recombining signals
-                     along the `time_points` (last) dimension.
+                     along the `num_time_windows_de` (last) dimension.
 
     Returns:
         np.ndarray: Augmented signals. The number of output samples depends on
                     `num_recombination_pairs` (2 * `num_recombination_pairs` + 1).
                     For `num_subjects = 45` (SEED-like), this is 45 samples.
     """
-    num_subjects = signal.shape[0]
-    
+    num_subjects = signal.shape[0] # This will correctly be 45
+
     # Determine num_recombination_pairs based on original code's fixed loops.
+    # This logic is based on the *expected* number of subjects per video clip.
     if num_subjects == 45: # SEED: 15 subjects * 3 trials each = 45 samples per video group
         num_recombination_pairs = 22 # `range(0, 22)` in SSL_training(SEED).py
     elif num_subjects == 40: # DEAP: 40 trials per subject, if `ss` is 40.
         num_recombination_pairs = 16 # `range(0, 16)` in SSL_training(DEAP).py
     else:
-        # Fallback if other `num_subjects` are encountered (e.g., for different datasets).
-        # This part of the original code is heuristic. We'll stick to fixed numbers for now.
-        raise ValueError(f"Unsupported num_subjects_per_video: {num_subjects}. Expected 45 (SEED) or 40 (DEAP).")
+        # This ValueError is correctly triggered if data is not shaped as expected for Meiosis.
+        # It means the data preparation or DataLoader is not providing (45, F, C, T_de) or (40, F, C, T_de).
+        # Given your previous `prepare_seed_data.py` output, it *should* be 45.
+        raise ValueError(f"Unsupported num_subjects_per_video: {num_subjects}. Expected 45 (SEED) or 40 (DEAP). "
+                         f"Please check data preparation and DataLoader batching for Meiosis input.")
 
     new_signal1 = []
     new_signal2 = []
 
     for i in range(num_recombination_pairs):
         si = rand_subs_stre[i]
-        sj = rand_subs_stre[i + Q] # Q=2 means take rand_subs_stre[i] and rand_subs_stre[i+2]
+        sj = rand_subs_stre[i + Q] 
         
         # Concatenate along the time_points dimension (axis=-1)
+        # signal[si, :, :, :split] -> (num_bands, num_channels, split_length)
+        # signal[sj, :, :, split:] -> (num_bands, num_channels, remaining_length)
         xi = np.concatenate([signal[si, :, :, :split], signal[sj, :, :, split:]], axis=-1)
         xj = np.concatenate([signal[sj, :, :, :split], signal[si, :, :, split:]], axis=-1)
         

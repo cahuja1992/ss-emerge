@@ -98,6 +98,17 @@ def main(args):
     model_cfg = config['model']
     model_type = model_cfg['model_type'] # "SS_EMERGE_Encoder" or "ResNetEEG"
 
+    # Determine which encoder's parameters to use for dataset initialization
+    # and for generating edge indices.
+    common_encoder_params = None
+    if model_type == "SS_EMERGE_Encoder":
+        common_encoder_params = model_cfg['encoder']
+    elif model_type == "ResNetEEG":
+        common_encoder_params = model_cfg['ResNetEEG']
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}. Expected 'SS_EMERGE_Encoder' or 'ResNetEEG'.")
+
+
     # Get device
     device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() and args.gpu >= 0 else "cpu")
 
@@ -110,25 +121,24 @@ def main(args):
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")
 
-    return_de_features = (model_type == "SS_EMERGE_Encoder")
-
-    # Get common encoder params for dataset init
-    common_encoder_params = model_cfg['encoder'] if model_type == "SS_EMERGE_Encoder" else model_cfg['ResNetEEG']
-    
+    # Instantiate Dataset for FINETUNING
     train_dataset = DatasetClass(
-        data_path=os.path.join(data_root, config['train_data_path']),
-        labels_path=os.path.join(data_root, config['train_labels_path']),
-        sfreq=common_encoder_params['T_timesteps'], # Use T_timesteps from relevant encoder config
+        data_root=data_root, # Pass data_root
+        is_train=True,
+        mode='finetune', # <--- KEY CHANGE: Specify 'finetune' mode
+        sfreq=common_encoder_params['T_timesteps'], # Original SFREQ for DE calculation context
         bands=config.get('bands', {'delta': (1, 4), 'theta': (4, 8), 'alpha': (8, 14), 'beta': (14, 31), 'gamma': (31, 50)}),
-        return_de_features=return_de_features,
-        label_proportion=label_proportion # Pass label proportion for few-shot
+        return_de_features=(model_type == "SS_EMERGE_Encoder"), # True for SS-EMERGE, False for ResNetEEG
+        label_proportion=label_proportion, # Pass label proportion for few-shot
+        random_seed=42 # For reproducibility of subsetting
     )
     val_dataset = DatasetClass(
-        data_path=os.path.join(data_root, config['test_data_path']),
-        labels_path=os.path.join(data_root, config['test_labels_path']),
-        sfreq=common_encoder_params['T_timesteps'], # Use T_timesteps from relevant encoder config
+        data_root=data_root, # Pass data_root
+        is_train=False,
+        mode='finetune', # <--- KEY CHANGE: Specify 'finetune' mode
+        sfreq=common_encoder_params['T_timesteps'],
         bands=config.get('bands', {'delta': (1, 4), 'theta': (4, 8), 'alpha': (8, 14), 'beta': (14, 31), 'gamma': (31, 50)}),
-        return_de_features=return_de_features,
+        return_de_features=(model_type == "SS_EMERGE_Encoder"),
         label_proportion=1.0 # Validation always uses 100% labels
     )
     
